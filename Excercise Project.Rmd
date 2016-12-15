@@ -1,0 +1,103 @@
+---
+title: "Machine Learning Project"
+author: "Sean Broderick"
+date: "December 14, 2016"
+output: html_document
+---
+###Background:Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset
+###Data Location: The training data for this project are available here:
+###https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+###The test data are available here:
+###https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+###Data Provided by:Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013. 
+
+###Read more: http://groupware.les.inf.puc-rio.br/har#ixzz4SpgbXdEp
+
+###Import the Training and Testing datasets into R
+```{r}
+library(caret)
+
+training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings = c("NA", "", "#DIV/0!"))
+
+testing <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", na.strings = c("NA", "", "#DIV/0!"))
+
+```
+###Keep only variables that are necessary for the analysis. To find out which variables are needed, please refer to the following link (http://groupware.les.inf.puc-rio.br/static/WLE/WearableComputing_weight_lifting_exercises_biceps_curl_variations.csv). Here you will notice that only certain variables are measured. 
+
+```{r}
+trunTrain <- grepl("^total|^gyro|^accel|^magnet|^roll|^pitch|^yaw|^classe",names(training))
+
+train_Trun <- training[,trunTrain]
+
+
+trunTest <- grepl("^total|^gyro|^accel|^magnet|^roll|^pitch|^yaw|^problem",names(testing))
+
+ 
+test_Trun <- testing[,trunTest]
+
+```
+###After the above code, the data sets (testing & training) should be shortened to 53 variables from the original 160 variables.
+
+###In the code below, we need to partition the training data set into 2 data sets. One will be the training which we will create the models and the second, the validation set, will be used to measure the out of sample error. The out of sample error will be measured by a k folds cross validation methodology. Five folds will be used for all models built.
+
+```{r}
+intrain <- createDataPartition(y=train_Trun$classe, p=.7, list = F)
+
+tr <- train_Trun[intrain,]
+
+te <- train_Trun[-intrain,]
+
+```
+
+###Here we are going to build a decision tree model. In the code below, we will also implement the K folds methodology to measure the out of sample error.
+
+```{r}
+library(rattle)
+
+set.seed(4433)
+
+folds <- trainControl(method="cv", number = 5)
+
+tree <- train(classe~., data = tr, method="rpart", trControl=folds)
+
+fancyRpartPlot(tree$finalModel)
+
+rpartaccur <- confusionMatrix(predict(tree,newdata = te),te$classe)
+rpartaccur
+```
+###Analysis:The Decision Tree model is a poor predictor of the Classe variable. This is shown to be the case by the accuracy of ~ 56% and a out of sample error or ~44%.
+
+###Here, we are going to a Gradient Boosting Machine (GBM) model.
+
+```{r}
+set.seed(4433)
+
+gbm <- train(classe~., data = tr, method="gbm", trControl=folds)
+
+gbmaccur <- confusionMatrix(predict(gbm,newdata = te),te$classe)
+
+gbmaccur
+```
+###Analysis:The predicitve power of this algorithm is quite high with a ~95% accuracy and a out of sample error of ~5%.
+
+###Here we are going to test out one more model/algoritm. Below, we are going to use a Random Forest approach.
+```{r}
+set.seed(4433)
+
+forest <- train(classe~., data = tr, method="rf", trControl=folds)
+
+forestaccur <- confusionMatrix(predict(forest, newdata=te),te$classe)
+
+forestaccur
+```
+###Analysis:The Randon Forest method is shown to be a strong predictor for the classe variable with ~99% and a out of sample error of less than 1 percent. This is the superior approach.
+
+###The code below will predict the 20 cases found in the Testing dataset above. The Random Forest algorithm will be used because it is most accurate.
+
+```{r,echo=FALSE}
+quiz <- predict(forest,test_Trun)
+quiz
+```
+###End of project
+
